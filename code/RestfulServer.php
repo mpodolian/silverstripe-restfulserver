@@ -355,9 +355,13 @@ class RestfulServer extends Controller {
 		
 		$responseFormatter = $this->getResponseDataFormatter($className);
 		if(!$responseFormatter) return $this->unsupportedMediaType();
-		
-		$obj = $this->updateDataObject($obj, $reqFormatter);
-		
+
+		try {
+		    $obj = $this->updateDataObject($obj, $reqFormatter);
+        } catch (ValidationException $e) {
+            return $this->notValid($e->getMessage());
+        }
+
 		$this->getResponse()->setStatusCode(200); // Success
 		$this->getResponse()->addHeader('Content-Type', $responseFormatter->getOutputContentType());
 
@@ -412,9 +416,13 @@ class RestfulServer extends Controller {
 			if(!$reqFormatter) return $this->unsupportedMediaType();
 		
 			$responseFormatter = $this->getResponseDataFormatter($className);
-		
+
+			try {
 			$obj = $this->updateDataObject($obj, $reqFormatter);
-		
+            } catch (ValidationException $e) {
+                return $this->notValid($e->getMessage());
+            }
+
 			$this->getResponse()->setStatusCode(201); // Created
 			$this->getResponse()->addHeader('Content-Type', $responseFormatter->getOutputContentType());
 
@@ -460,7 +468,7 @@ class RestfulServer extends Controller {
 		}
 		
 		// @todo Disallow editing of certain keys in database
-		$data = array_diff_key($data, array('ID','Created'));
+		$data = array_diff_key($data, array_fill_keys(array('ID','Created'), null));
 		
 		$apiAccess = singleton($this->urlParams['ClassName'])->stat('api_access');
 		if(is_array($apiAccess) && isset($apiAccess['edit'])) {
@@ -548,6 +556,17 @@ class RestfulServer extends Controller {
 		$this->response->setStatusCode(415); // Unsupported Media Type
 		$this->getResponse()->addHeader('Content-Type', 'text/plain');
 		return "Unsupported Media Type";
+	}
+
+    protected function notValid($message = '') {
+        $this->response->setStatusCode(403); // Forbidden - unable to proceed with the provided set of data
+        $this->getResponse()->addHeader('Content-Type', 'text/plain');
+
+        if (empty($message)) {
+            $message = "The provided data is not valid";
+        }
+
+        return $message;
 	}
 	
 	/**
